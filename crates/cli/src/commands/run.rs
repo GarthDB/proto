@@ -249,15 +249,47 @@ fn run_global_tool(
 }
 
 #[tracing::instrument(skip_all)]
-pub async fn run(session: ProtoSession, args: RunArgs) -> AppResult {
+pub async fn run(session: ProtoSession, mut args: RunArgs) -> AppResult {
     let mut tool = match session.load_tool(&args.context).await {
         Ok(tool) => tool,
-        Err(error) => {
-            return if matches!(error, ProtoLoaderError::UnknownTool { .. }) {
-                run_global_tool(session, args, error.into()).map(|_| None)
+        Err(ProtoLoaderError::UnknownTool { id }) => {
+            // Check if this is a bin provided by another tool
+            debug!(
+                bin = id.as_str(),
+                "Tool not found, checking if it's a bin of another tool"
+            );
+
+            let mut registry = session.create_registry();
+            
+            // Load all plugins (built-in + external) to find which tool provides this bin
+            let all_plugins = registry.load_plugins().await?;
+            let parent_plugin = all_plugins.iter().find(|plugin| {
+                plugin.bins.contains(&id.to_string()) && plugin.id != id
+            });
+
+            if let Some(plugin) = parent_plugin {
+                debug!(
+                    bin = id.as_str(),
+                    parent_tool = plugin.id.as_str(),
+                    "Detected that {} is a bin of {}, redirecting",
+                    id.as_str(),
+                    plugin.id.as_str()
+                );
+
+                // Update args to run the parent tool with this bin as an alternate executable
+                args.exe = Some(id.to_string());
+                args.context = ToolContext::new(plugin.id.clone());
+
+                // Load the parent tool
+                session.load_tool(&args.context).await?
             } else {
-                Err(error.into())
-            };
+                // Not a bin, fall back to global tool
+                return run_global_tool(session, args, ProtoLoaderError::UnknownTool { id }.into())
+                    .map(|_| None);
+            }
+        }
+        Err(error) => {
+            return Err(error.into());
         }
     };
 
