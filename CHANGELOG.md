@@ -20,7 +20,6 @@
 #### 🚀 Updates
 
 - Improved `proto run` to automatically detect when a requested command is a bin provided by another tool (e.g., `npx` from `npm`, `bunx` from `bun`) and redirect to the parent tool with the correct executable.
-  - This allows running commands like `proto run npx` directly without needing to know that `npx` is part of `npm`.
 
 ## 0.54.2
 

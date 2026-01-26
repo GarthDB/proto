@@ -253,7 +253,8 @@ pub async fn run(session: ProtoSession, mut args: RunArgs) -> AppResult {
     let mut tool = match session.load_tool(&args.context).await {
         Ok(tool) => tool,
         Err(ProtoLoaderError::UnknownTool { id }) => {
-            // Check if this is a bin provided by another tool
+            // Check if this is a bin provided by another tool (e.g., `npx` from `npm`).
+            // If found, redirect to the parent tool with the bin as an alternate executable.
             debug!(
                 bin = id.as_str(),
                 "Tool not found, checking if it's a bin of another tool"
