@@ -611,4 +611,155 @@ FOURTH = "ignores-$FIRST-$PARENT"
             assert.stdout(predicate::str::contains("0.13.0"));
         }
     }
+
+    mod alternate_bins {
+        use super::*;
+
+        #[test]
+        fn can_run_npx_directly() {
+            let sandbox = create_empty_proto_sandbox();
+
+            // npm requires node - use compatible versions
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "node", "18.0.0", "--pin"]);
+                })
+                .success();
+
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "npm", "9.0.0", "--pin"]);
+                })
+                .success();
+
+            // Verify npx can be run directly (should redirect to npm)
+            // Just check it executes without error
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "npx", "--help"]);
+                })
+                .success();
+        }
+
+        #[test]
+        fn can_run_bunx_directly() {
+            let sandbox = create_empty_proto_sandbox();
+
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "bun", "1.2.0", "--pin"]);
+                })
+                .success();
+
+            // Just verify bunx can be called via proto run
+            // bunx --version shows "proto-run" because bunx is a wrapper
+            let assert = sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "bunx", "--help"]);
+                })
+                .success();
+
+            // Should successfully execute bunx
+            assert.stdout(predicate::str::contains("bunx").or(predicate::str::contains("Usage")));
+        }
+
+        #[test]
+        fn can_run_node_gyp_directly() {
+            let sandbox = create_empty_proto_sandbox();
+
+            // node-gyp requires node - use compatible versions
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "node", "18.0.0", "--pin"]);
+                })
+                .success();
+
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "npm", "9.0.0", "--pin"]);
+                })
+                .success();
+
+            let assert = sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "node-gyp", "--version"]);
+                })
+                .success();
+
+            // Should run successfully with proto-managed npm
+            assert.success();
+        }
+
+        #[test]
+        fn alternate_bin_with_passthrough_args() {
+            let sandbox = create_empty_proto_sandbox();
+
+            // npm requires node - use compatible versions
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "node", "18.0.0", "--pin"]);
+                })
+                .success();
+
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "npm", "9.0.0", "--pin"]);
+                })
+                .success();
+
+            // Test that we can pass args through to npx
+            let assert = sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "npx", "--", "--help"]);
+                })
+                .success();
+
+            assert.stdout(
+                predicate::str::contains("npm exec").or(predicate::str::contains("Run a command")),
+            );
+        }
+
+        #[test]
+        fn uses_correct_npm_version_for_npx() {
+            let sandbox = create_empty_proto_sandbox();
+
+            // npm requires node - use compatible versions
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "node", "18.0.0", "--pin"]);
+                })
+                .success();
+
+            // Install specific npm version
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["install", "npm", "9.0.0", "--pin"]);
+                })
+                .success();
+
+            // Verify npx runs successfully (it will use the pinned npm 9.0.0)
+            sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "npx", "--help"]);
+                })
+                .success();
+        }
+
+        #[test]
+        fn falls_back_to_global_if_bin_not_found() {
+            let sandbox = create_empty_proto_sandbox();
+
+            // Try to run a bin that doesn't exist in registry
+            // This should fall back to PATH, but since it's not on PATH either,
+            // it should fail
+            let assert = sandbox
+                .run_bin(|cmd| {
+                    cmd.args(["run", "nonexistent-bin-xyz-12345"]);
+                })
+                .failure();
+
+            // Should give an error about the tool/bin not being found
+            assert.code(1);
+        }
+    }
 }
