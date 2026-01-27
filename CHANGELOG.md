@@ -19,7 +19,7 @@
 
 #### 🚀 Updates
 
-- Improved `proto run` to automatically detect when a requested command is a bin provided by another tool (e.g., `npx` from `npm`, `bunx` from `bun`) and redirect to the parent tool with the correct executable.
+- Improved `proto run` to automatically detect when a requested command is a bin provided by another tool (e.g., `npx` from `npm`, `bunx` from `bun`) by checking the local shims registry, and redirect to the parent tool with the correct executable.
 
 ## 0.54.2
 
